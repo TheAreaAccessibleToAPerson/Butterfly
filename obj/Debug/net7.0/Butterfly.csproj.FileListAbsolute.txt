@@ -1,0 +1,15 @@
+/home/dmitry/Документы/Butterfly/bin/Debug/net7.0/Butterfly
+/home/dmitry/Документы/Butterfly/bin/Debug/net7.0/Butterfly.deps.json
+/home/dmitry/Документы/Butterfly/bin/Debug/net7.0/Butterfly.runtimeconfig.json
+/home/dmitry/Документы/Butterfly/bin/Debug/net7.0/Butterfly.dll
+/home/dmitry/Документы/Butterfly/bin/Debug/net7.0/Butterfly.pdb
+/home/dmitry/Документы/Butterfly/obj/Debug/net7.0/Butterfly.csproj.AssemblyReference.cache
+/home/dmitry/Документы/Butterfly/obj/Debug/net7.0/Butterfly.GeneratedMSBuildEditorConfig.editorconfig
+/home/dmitry/Документы/Butterfly/obj/Debug/net7.0/Butterfly.AssemblyInfoInputs.cache
+/home/dmitry/Документы/Butterfly/obj/Debug/net7.0/Butterfly.AssemblyInfo.cs
+/home/dmitry/Документы/Butterfly/obj/Debug/net7.0/Butterfly.csproj.CoreCompileInputs.cache
+/home/dmitry/Документы/Butterfly/obj/Debug/net7.0/Butterfly.dll
+/home/dmitry/Документы/Butterfly/obj/Debug/net7.0/refint/Butterfly.dll
+/home/dmitry/Документы/Butterfly/obj/Debug/net7.0/Butterfly.pdb
+/home/dmitry/Документы/Butterfly/obj/Debug/net7.0/Butterfly.genruntimeconfig.cache
+/home/dmitry/Документы/Butterfly/obj/Debug/net7.0/ref/Butterfly.dll
