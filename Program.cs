@@ -32,6 +32,20 @@
     {
         void Construction()
         {
+            listen_echo<string>("echotest")
+                .output_to((message, response) => 
+                {
+                    Console(message);
+
+                    response.To("ответ");
+                });
+            
+            listen_message<string>("messagetest")
+                .output_to((message) => 
+                {
+                    Console(message);
+                });
+
             int i = 0;
             add_event("1", () => 
             {
@@ -57,8 +71,18 @@
 
     public sealed class Test2 : Controller.Board
     {
+        IInput<string> send_echo, send_message;
+
         void Construction()
         {
+            send_echo<string>(ref send_echo, "echotest")
+                .output_to((message) => 
+                {
+                    Console($"Ответ:" + message);
+                });    
+
+            send_message<string>(ref send_message, "messagetest");
+
             obj<Test3>("TEST3");
             obj<Test3>("TEST31");
             obj<Test3>("TEST32");
@@ -77,8 +101,8 @@
 
         void Start()
         {
-            //Console("START");
-            //destroy();
+            send_echo.To("Hello1");
+            send_message.To("Hello2");
         }
 
         void Stop()
@@ -140,7 +164,7 @@
 
         void Update1()
         {
-            destroy();
+            //destroy();
         }
 
         void Update()
@@ -149,6 +173,7 @@
 
         void Start()
         {
+            destroy();
             //Console("START");
         }
 
