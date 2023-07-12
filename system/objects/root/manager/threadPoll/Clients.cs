@@ -60,7 +60,9 @@ namespace Butterfly.system.objects.root.manager
         public void Run()
         {
             for (int i = 0; i < _indexEmptySlot; i++)
+            {
                 _runs[i].Invoke();
+            }
         }
 
         public void Add(object ticket)
@@ -102,23 +104,26 @@ namespace Butterfly.system.objects.root.manager
                         _idClients[index] = ulong.MaxValue;
                         _indexInSubscribePollManager[index] = -1;
 
-                        // Если это был единсвеный клиент.
-                        if ((_indexEmptySlot - 1) < 0) return;
 
-                        // Если освобожденый слот и был крайним. То инкрементируем 
-                        // край массива с данными клиетов, и перейдем к обработки следующего билета.
-                        if ((_indexEmptySlot - 1) == index)
+                        if ((_indexEmptySlot - 1) < 0)
+                        {
+                            return;
+                        }
+                        else if ((_indexEmptySlot - 1) == 0)
                         {
                             _indexEmptySlot--;
                             return;
                         }
-
-                        // Если индекс отписаного клинта выше чем крайний клиент,
-                        // то перейдем к следующему билету.
-                        if ((_indexEmptySlot - 1) < index)
+                        else if ((_indexEmptySlot - 1) == index)
+                        {
+                            _indexEmptySlot--;
+                            return;
+                        }
+                        else if ((_indexEmptySlot + 1) == index)
                         {
                             return;
                         }
+
 
                         // Декриментируем крайнее значение. Так как крайний клиент переедит 
                         // в освободившийся слот.

@@ -43,19 +43,24 @@ namespace Butterfly.system.objects.main.manager
                         ((manager.IDispatcher)value).Process(manager.Dispatcher.Command.CONSTRUCTION_OBJECT);
                     break;
 
+                case manager.LifeCyrcle.Data.BEGIN_CONFIGURATE:
+                    foreach (main.Object value in _values)
+                        ((manager.IDispatcher)value).Process(manager.Dispatcher.Command.CONFIGURATE_OBJECT);
+                    break;
+
                 case manager.LifeCyrcle.Data.BEGIN_STARTING:
                     foreach (main.Object value in _values)
                         ((manager.IDispatcher)value).Process(manager.Dispatcher.Command.STARTING_OBJECT);
                     break;
 
-                case manager.LifeCyrcle.Data.CONTINUE_STARTING:
+                case manager.LifeCyrcle.Data.BEGIN_START:
                     foreach (main.Object value in _values)
-                        ((manager.IDispatcher)value).Process(manager.Dispatcher.Command.CONTINUE_STARTING_OBJECT);
+                        ((manager.IDispatcher)value).Process(manager.Dispatcher.Command.START_OBJECT);
                     break;
 
                 case manager.LifeCyrcle.Data.BEGIN_STOPPING:
                     foreach (main.Object value in _values)
-                        ((manager.IDispatcher)value).Process(manager.Dispatcher.Command.STOPPING_OBJECT);
+                        ((manager.ILifeCyrcle)value).ContinueDestroy();
                     break;
             }
         }
@@ -70,7 +75,7 @@ namespace Butterfly.system.objects.main.manager
                     if (_values[i] is BranchObjectType valueReduse)
                         return valueReduse;
                     else
-                        Exception(data.BranchManager.x100002, typeof(BranchObjectType).FullName, 
+                        Exception(data.BranchManager.x100002, typeof(BranchObjectType).FullName,
                             key, _values[i].GetType().FullName);
                 }
             }
@@ -115,11 +120,19 @@ namespace Butterfly.system.objects.main.manager
 
         public void Remove(string key)
         {
-            for(int i = 0; i < _keys.Length; i++)
-                if (_keys[i] == key) Count--;
+            lock (_stateInformation.Locker)
+            {
+                for (int i = 0; i < _keys.Length; i++)
+                    if (_keys[i] == key) Count--;
 
-            if (Count == 0) 
-                ((manager.ILifeCyrcle)_DOMInformation.CurrentObject).ContinueDestroy();
+                //Console($"REMOVE:{key}" + " Count:" + Count);
+
+                if (Count == 0 && _stateInformation.IsStop == false)
+                {
+                    ((manager.IDispatcher)_DOMInformation.CurrentObject).
+                        Process(manager.Dispatcher.Command.CONTINUE_STOPPING);
+                }
+            }
         }
     }
 }

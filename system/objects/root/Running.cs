@@ -1,6 +1,6 @@
 namespace Butterfly
 {
-    public class Gudron
+    public class Butterfly
     {
         /// <summary>
         /// Запускает систему.
@@ -8,7 +8,7 @@ namespace Butterfly
         /// <typeparam name="ObjectType">Обьект преставляющий систему. 
         /// Обьект должен быть унаследован от абстрактного класса Controller.
         /// </typeparam>
-        public static void run<ObjectType>(Gudron.Settings settings)
+        public static void fly<ObjectType>(Butterfly.Settings settings)
             where ObjectType : system.objects.main.Object, new()
         {
             ((system.objects.root.description.ILife)

@@ -91,6 +91,24 @@ namespace Butterfly
         {
             public Board() : base(system.objects.main.information.Header.Data.BOARD) { }
 
+            public new abstract class LocalField<F> : Board, ILocalField
+            {
+                public LocalField() : base() {}
+
+                protected F Field;
+
+                void ILocalField.SetField(object value)
+                {
+                    if (value is F valueReduse)
+                    {
+                        Field = valueReduse;
+                    }
+                    else
+                        Exception($"При создании обьекта вы передали локальное значение типа {value.GetType()}" +
+                                  $", но при создании обьекта указали ожидаемый тип {typeof(F).FullName}");
+                }
+            }
+
             public new class Output<T> : Board, system.objects.main.IRedirect<T>
             {
                 public Output() { }

@@ -13,8 +13,9 @@ namespace Butterfly.system.objects.main.manager
         public interface ILifeCyrcle
         {
             public void Contruction();
+            public void Configurate();
             public void Starting();
-            public void ContinueStarting();
+            public void Start();
             public void Stopping();
             public void ContinueStopping();
         }
@@ -39,14 +40,7 @@ namespace Butterfly.system.objects.main.manager
         {
             void Start();
             void Stop();
-        }
-
-        public interface INode
-        {
-            /// <summary>
-            /// Создает отложеные обьекты которые были добавлены в методе Start(). 
-            /// </summary>
-            void CreatingDeferredObject();
+            void TaskStop();
         }
 
         public interface IGlobalObjects
@@ -92,6 +86,8 @@ namespace Butterfly.system.objects.main.manager
             /// После того как Node обьект получен ответ от пулла, о том что все его регистрационые билеты
             /// для регистрации на события были обработаны, запустится метод LifeCyrcleManager.Starting. 
             /// </summary>
+            public const string CONFIGURATE_OBJECT = "ConfigurateObject";
+
             public const string STARTING_OBJECT = "StartingObject";
 
             /// <summary>
@@ -99,7 +95,7 @@ namespace Butterfly.system.objects.main.manager
             /// В ней мы вызвали метод Configurate, и если в данном методе обьект не был 
             /// выставлен на уничтожение, то запустился метод Start(). 
             /// </summary>
-            public const string CONTINUE_STARTING_OBJECT = "TheFirstStageStartingIsClosed.";
+            public const string START_OBJECT = "StartObject";
 
             /// <summary>
             /// Запускаем потоки.
@@ -142,29 +138,31 @@ namespace Butterfly.system.objects.main.manager
         /// <summary>
         /// Текущая команда которую выполняет диспетчер. 
         /// </summary>
-        private string CurrentProcess = Command.NONE;
+        public string CurrentProcess = Command.NONE;
 
         private dispatcher.IGlobalObjects _globalObjectsDispatcher;
         private dispatcher.ILifeCyrcle _lifeCyrcleDispatcher;
         private dispatcher.ISubscribe _subscribeDispatcher;
         private dispatcher.IThreads _threadsDispatcher;
-        private dispatcher.INode _nodeDispatcher;
 
-        public Dispatcher(informing.IMain mainInforming, information.Header headerInformation)
+        private readonly information.Tegs _tegsInformation;
+
+        public Dispatcher(informing.IMain mainInforming, information.Header headerInformation, information.Tegs tegsInformation)
                 : base("DispatcherManager", mainInforming)
         {
             _headerInformation = headerInformation;
+
+            _tegsInformation = tegsInformation;
         }
 
         public void Initialize(dispatcher.IGlobalObjects globalObjectsDispatcher,
             dispatcher.ILifeCyrcle lifeCyrcleDispathcer, dispatcher.ISubscribe subscribeDispatcher,
-                dispatcher.IThreads threadsDispatcher, dispatcher.INode nodeDispatcher)
+                dispatcher.IThreads threadsDispatcher)
         {
             _globalObjectsDispatcher = globalObjectsDispatcher;
             _lifeCyrcleDispatcher = lifeCyrcleDispathcer;
             _subscribeDispatcher = subscribeDispatcher;
             _threadsDispatcher = threadsDispatcher;
-            _nodeDispatcher = nodeDispatcher;
         }
         /***************************************************************************************
 
@@ -191,29 +189,35 @@ namespace Butterfly.system.objects.main.manager
 
                     break;
 
+                case Command.CONFIGURATE_OBJECT:
+
+                    CurrentProcess = Command.CONFIGURATE_OBJECT;
+
+                    _lifeCyrcleDispatcher.Configurate();
+
+                    break;
+                
                 case Command.STARTING_OBJECT:
 
                     CurrentProcess = Command.STARTING_OBJECT;
 
                     _lifeCyrcleDispatcher.Starting();
 
+                break;
+
+                case Command.START_OBJECT:
+
+                    CurrentProcess = Command.START_OBJECT;
+
+                    _lifeCyrcleDispatcher.Start();
+
                     break;
 
-                case Command.CONTINUE_STARTING_OBJECT:
+                case Command.STARTING_THREAD:
 
-                    CurrentProcess = Command.CONTINUE_STARTING_OBJECT;
-
-                    _lifeCyrcleDispatcher.ContinueStarting();
-
-                    break;
-
-                case Command.STARTING_THREAD + __.AND + Command.CREATING_DEFERRED_NODE_OBJECT:
-
-                    CurrentProcess = Command.STARTING_THREAD + __.AND + Command.CREATING_DEFERRED_NODE_OBJECT;
+                    CurrentProcess = Command.STARTING_THREAD;
 
                     _threadsDispatcher.Start();
-
-                    _nodeDispatcher.CreatingDeferredObject();
 
                     break;
 
@@ -221,7 +225,11 @@ namespace Butterfly.system.objects.main.manager
 
                     CurrentProcess = Command.STOPPING_OBJECT;
 
-                    _threadsDispatcher.Stop();
+                    if (_tegsInformation.Contains(root.manager.ActionInvoke.TEG))
+                    {
+                        _threadsDispatcher.TaskStop();
+                    }
+                    else _threadsDispatcher.Stop();
 
                     _lifeCyrcleDispatcher.Stopping();
 
@@ -236,7 +244,6 @@ namespace Butterfly.system.objects.main.manager
                     break;
 
                 case Command.CONTINUE_STOPPING:
-                case Command.END_UNSUBSCRIBE:
 
                     CurrentProcess = Command.CONTINUE_STOPPING;
 

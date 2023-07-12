@@ -89,7 +89,7 @@ namespace Butterfly.system.objects.main.information
             ulong nestingNodeNamberInTheNode, ulong[] parentObjectsID, main.Object currentObject, 
                 main.Object parentObject, main.Object nodeObject, main.Object nearIndependentNodeObject, root.IManager rootManager)
         {
-            ID = s_indexUniqueObjectID++;
+            ID = DOM.s_indexUniqueObjectID++;
 
             KeyObject = keyObject;
             NodeID = nodeID;
@@ -117,7 +117,7 @@ namespace Butterfly.system.objects.main.information
                 main.Object currentObject, main.Object parentObject, main.Object nearIndependentNodeObject,
                     root.IManager rootManager)
         {
-            ID = NodeID = s_indexUniqueObjectID++;
+            ID = NodeID = DOM.s_indexUniqueObjectID++;
 
             KeyObject = keyObject;
             NestingNodeNamberInTheSystem = nestingNodeNamberInTheSystem;

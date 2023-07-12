@@ -14,6 +14,8 @@ namespace Butterfly.system.collection
             }
         }
 
+        public int Count {get{lock(_locker) return _values.Count;}}
+
         public bool TryExtractAll(out ValueType[] values)
         {
             values = null;
@@ -38,8 +40,6 @@ namespace Butterfly.system.collection
                         return false;
                 }
             }
-
-            return false;
         }
     }
 }

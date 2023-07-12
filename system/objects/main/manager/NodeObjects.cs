@@ -1,6 +1,6 @@
 namespace Butterfly.system.objects.main.manager
 {
-    public sealed class NodeObjects : Informing, dispatcher.INode
+    public sealed class NodeObjects : Informing
     {
         private readonly informing.IMain _mainInforming;
 
@@ -30,7 +30,13 @@ namespace Butterfly.system.objects.main.manager
         /// Количесво Node обьектов. 
         /// </summary>
         /// <value></value>
-        public int Count { get { return _values == null ? 0 : _values.Count; } }
+        public int Count
+        {
+            get
+            {
+                lock (_stateInformation.Locker) return _values == null ? 0 : _values.Count;
+            }
+        }
 
         /// <summary>
         /// Текущее количесво собираемых обьектов.
@@ -55,25 +61,28 @@ namespace Butterfly.system.objects.main.manager
                 }
                 else
                 {
-                    if ((--_collectedCount) == 0)
+                    if (_headerInformation.IsSystemController())
                     {
-                        if (_stateInformation.IsDestroying)
+                        if ((--_collectedCount) == -1)
                         {
-                            StoppingAllObject();
+                            _collectedCount = 0;
+
+                            if (_stateInformation.IsDestroying)
+                            {
+                                StoppingAllObject();
+                            }
                         }
                     }
-
-                    /*
-                                        if ((--_collectedCount) == 0 || _headerInformation.IsSystemController())
-                                        {
-                                            _collectedCount = 0;
-
-                                            if (_stateInformation.IsDestroying)
-                                            {
-                                                StoppingAllObject();
-                                            }
-                                        }
-                                        */
+                    else
+                    {
+                        if ((--_collectedCount) == 0)
+                        {
+                            if (_stateInformation.IsDestroying)
+                            {
+                                _DOMInformation.RootManager.ActionInvoke(StoppingAllObject);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -83,7 +92,8 @@ namespace Butterfly.system.objects.main.manager
         {
             lock (_stateInformation.Locker)
             {
-                if (_stateInformation.IsStart || _stateInformation.IsStarting || _stateInformation.IsSubscribe)
+                if (_stateInformation.IsDestroying == false &&
+                    (_stateInformation.IsStart || _stateInformation.IsStarting || _stateInformation.IsSubscribe))
                 {
                     if (_values is null) _values = new Dictionary<string, Object>();
 
@@ -127,11 +137,8 @@ namespace Butterfly.system.objects.main.manager
 
                         _values.Add(key, nodeObject);
 
-                        if (_stateInformation.IsStart)
-                        {
-                            _collectedCount++;
-                            _DOMInformation.RootManager.ActionInvoke(nodeObject.CreatingNode);
-                        }
+                        _collectedCount++;
+                        _DOMInformation.RootManager.ActionInvoke(nodeObject.CreatingNode);
 
                         return nodeObject;
                     }
@@ -173,24 +180,6 @@ namespace Butterfly.system.objects.main.manager
             return nodeObject;
         }
 
-        /// <summary>
-        /// Запускает обьекты добавленые в методе Start(). 
-        /// </summary>
-        void dispatcher.INode.CreatingDeferredObject()
-        {
-            lock (_stateInformation.Locker)
-            {
-                if (_values == null) return;
-
-                foreach (main.Object value in _values.Values)
-                {
-                    _collectedCount++;
-
-                    ((main.description.IDOM)value).CreatingNode();
-                }
-            }
-        }
-
         public void StoppingAllObject()
         {
             lock (_stateInformation.Locker)
@@ -203,17 +192,38 @@ namespace Butterfly.system.objects.main.manager
                     {
                         if (_stateInformation.IsDestroying)
                         {
-                            ((manager.ILifeCyrcle)_DOMInformation.CurrentObject).ContinueDestroy();
+                            _DOMInformation.RootManager.ActionInvoke
+                                (((manager.ILifeCyrcle)_DOMInformation.CurrentObject).ContinueDestroy);
                         }
                     }
                     else
                     {
                         foreach (main.Object nodeObject in _values.Values)
                         {
-                            if (nodeObject.StateInformation.IsDestroying)
-                                ((manager.ILifeCyrcle)nodeObject).ContinueDestroy();
+                            // Если обьект ялвяется Branch и уже находится в процессе
+                            // остановки или же должен быть уничтожен отложено после окончания
+                            // подписки, то нам не нужно дублировать его уничтожение.
+                            if (nodeObject.HeaderInformation.IsBranchObject() &&
+                                (nodeObject.StateInformation.IsDestroying == false &&
+                                nodeObject.StateInformation.IsDeferredDestroying == false))
+                            {
+                                //...
+                            }
                             else
-                                nodeObject.destroy();
+                            {
+                                // Если обьект уже был обьявлен как уничтожаемый, то приступаем
+                                // к его остановки.
+                                if (nodeObject.StateInformation.IsDestroying)
+                                {
+                                    ((manager.IDispatcher)nodeObject).
+                                        Process(manager.Dispatcher.Command.STOPPING_OBJECT);
+                                }
+                                else
+                                // Иначе нужно запустить процедуру уничтожения.
+                                {
+                                    ((ILifeCyrcle)nodeObject).ContinueDestroy();
+                                }
+                            }
                         }
                     }
                 }
@@ -238,15 +248,25 @@ namespace Butterfly.system.objects.main.manager
                         }
                     }
 
-                    SystemInformation($"Count:{_values.Count}");
+                    //SystemInformation($"Count:{_values.Count} NAME {key}");
 
-                    if (_collectedCount == 0 && _stateInformation.IsDestroying && _values.Count == 0)
+                    if (_stateInformation.IsStop == false && _collectedCount == 0 && (_stateInformation.IsDestroying
+                        || _stateInformation.IsStopping) && _values.Count == 0)
                     {
-                       ((manager.ILifeCyrcle)_DOMInformation.CurrentObject).ContinueDestroy();
+                        ((manager.IDispatcher)_DOMInformation.CurrentObject).
+                           Process(manager.Dispatcher.Command.CONTINUE_STOPPING);
                     }
                 }
                 else
-                    throw new Exception("EXCEPTION:" + key);
+                {
+                    if (_headerInformation.IsSystemController())
+                    {
+                    }
+                    else
+                    {
+                        Exception("EXCEPTION:" + key);
+                    }
+                }
             }
         }
     }

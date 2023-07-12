@@ -38,7 +38,7 @@ namespace Butterfly.system.objects.main.manager
 
         public void Add(string name, global::System.Action action, uint timeDelay, Thread.Priority priority)
         {
-            if (_stateInformation.IsStarting)
+            if (_stateInformation.IsSubscribe || _stateInformation.IsStarting)
             {
                 IsRuns = Hellper.ExpendArray(IsRuns, new Bool(true));
                 _prioritys = Hellper.ExpendArray(_prioritys, priority.ToString());
@@ -100,14 +100,18 @@ namespace Butterfly.system.objects.main.manager
                 thread.Start();
         }
 
-        public void Stop()
+        void dispatcher.IThreads.TaskStop()
+        {
+            Task.Run(((dispatcher.IThreads)this).Stop);
+        }
+
+        void dispatcher.IThreads.Stop()
         {
             if (_threads.Length == 0) return;
 
             string nameThreads = "";
             foreach(var nameThread in _threads)
                 nameThreads += nameThread.Name + " ";
-
 
             SystemInformation($"StoppingThreads:{nameThreads}");
 

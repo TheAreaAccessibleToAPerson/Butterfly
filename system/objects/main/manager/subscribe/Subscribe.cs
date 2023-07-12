@@ -28,6 +28,7 @@ namespace Butterfly.system.objects.main.manager
             public const string POLL = "Poll";
         }
 
+        private readonly information.Header _headerInformation;
         private readonly information.State _stateInformation;
         private readonly information.DOM _DOMInformation;
 
@@ -36,11 +37,6 @@ namespace Butterfly.system.objects.main.manager
         private readonly manager.IDispatcher _dispatcherManager;
 
         private readonly object _locker = new object();
-
-        /// <summary>
-        /// Общее количесво регистраций на подписки. 
-        /// </summary>
-        private bool RegisterToPoll = false;
 
         /// <summary>
         /// Когда нас подпишут, нам об этом сообщат, и мы инкременириует данное значение.
@@ -53,6 +49,7 @@ namespace Butterfly.system.objects.main.manager
                 manager.Dispatcher dispatcherManager)
             : base("SubscribeManager", mainInforming)
         {
+            _headerInformation = headerInformation;
             _stateInformation = stateInformation;
             _DOMInformation = DOMInformation;
             _dispatcherManager = dispatcherManager;
@@ -67,16 +64,14 @@ namespace Butterfly.system.objects.main.manager
         /// </summary>
         /// <param name="name">Имя пулла на который нужно подписаться.</param>
         /// <param name="action">Action который мы выставляем в пулл потоков для обработки.</param>
-        public void Add(string name, Action action, string type)
+        public void Add(string name, System.Action action, string type)
         {
-            //lock (_locker)
+            lock (_locker)
             {
                 if (_stateInformation.IsContruction)
                 {
-                    if (type == Subscribe.Type.POLL)
-                        RegisterToPoll = true;
-
-                    _pollController.Add(name, action, type);
+                    if (Type.POLL == type)
+                        _pollController.Add(name, action, type);
                 }
                 else
                     Exception($"Вы пытатесь добавить событие {name} не в методe Contruction().");
@@ -85,67 +80,66 @@ namespace Butterfly.system.objects.main.manager
 
         void dispatcher.ISubscribe.StartSubscribe()
         {
-            //lock (_locker)
+            lock (_locker)
             {
-                if (RegisterToPoll)
+                // Проверяем умеются ли у нас регистрационые билеты.
+                if (_pollController.IsRegisterTicket)
                 {
+                    // Данный метод сначало выставит флаг о том что мы начали подписку.
+                    // После отправит билет. Данный метод должен вызываться синхронно.
                     _pollController.Subscribe();
                 }
+                // Если регистрационых билетов нету, то продолжим создание обьекта.
                 else
                 {
-                    _DOMInformation.RootManager.ActionInvoke(() => 
-                    {
-                        _dispatcherManager.Process(manager.Dispatcher.Command.STARTING_OBJECT);
-                    });
+                    _dispatcherManager.Process(manager.Dispatcher.Command.START_OBJECT);
                 }
             }
         }
 
         void dispatcher.ISubscribe.StartUnsubscribe()
         {
-            //lock (_locker)
+            lock (_locker)
             {
-                if (RegisterToPoll)
+                // Если данный обьект отправлял регистрационые билеты, и ему пришол 
+                // ответ о том что регистрация окончилась, то мы отправим запрос на отписку.
+                if (_pollController.IsRegisterTicket && _pollController.IsSubscribe)
                 {
                     _pollController.Unsubscribe();
                 }
+                // Если у нас имеются регистрационые билеты, но мы не подписывались и 
+                // не ожидаем пока регистрация окончена, значит продолжаем остановку обьекта.
+                else if (_pollController.IsRegisterTicket && _pollController.IsSubscribe == false 
+                    && _pollController.IsRegisterSubscribe == false)
+                {
+                    _dispatcherManager.Process(manager.Dispatcher.Command.CONTINUE_STOPPING);
+                }
+                // Если обьект не имел регистрационых билетов и неначто небыл подписан,
+                // то продожим его уничтжение.
                 else
                 {
-                    _DOMInformation.RootManager.ActionInvoke(() => 
-                    {
-                        _dispatcherManager.Process(manager.Dispatcher.Command.END_UNSUBSCRIBE);
-                    });
+                    _dispatcherManager.Process(manager.Dispatcher.Command.CONTINUE_STOPPING);
                 }
             }
         }
 
         void description.ISubscribe.EndSubscribe()
         {
-            //lock (_locker)
+            lock (_locker)
             {
-                if (RegisterToPoll)
-                {
-                    _DOMInformation.RootManager.ActionInvoke(()
-                        => _dispatcherManager.Process(manager.Dispatcher.Command.STARTING_OBJECT));
-                }
-                else
-                    throw new Exception();
+                // Нас оповестили что подписка окончена продолжим создание обьекта.
+                _DOMInformation.RootManager.ActionInvoke(()
+                    => _dispatcherManager.Process(manager.Dispatcher.Command.START_OBJECT));
             }
         }
 
         void description.ISubscribe.EndUnsubscribe()
         {
-            //lock (_locker)
+            lock (_locker)
             {
-                if (RegisterToPoll)
-                {
-                    RegisterToPoll = false;
-
-                    _DOMInformation.RootManager.ActionInvoke(()
-                        => _dispatcherManager.Process(manager.Dispatcher.Command.END_UNSUBSCRIBE));
-                }
-                else
-                    throw new Exception();
+                // Нас оповетили что отписка закончена, продолжит уничтожение обьекта.
+                _DOMInformation.RootManager.ActionInvoke(()
+                    => _dispatcherManager.Process(manager.Dispatcher.Command.CONTINUE_STOPPING));
             }
         }
     }

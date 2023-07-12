@@ -11,18 +11,42 @@ namespace Butterfly.system.objects.main.controller
         /// <summary>
         /// Текущее состояние.
         /// </summary>
-        private string State = StateType.CREATING_TICKET;
+        private string _state = StateType.CREATING_TICKET;
+
+        /// <summary>
+        /// Мы выставили билеты на регистрацию. 
+        /// </summary>
+        /// <value></value>
+        public bool IsRegisterSubscribe
+        {
+            get
+            {
+                return _state == StateType.REGISTER_SUBSCRIBE;
+            }
+        }
+
+        /// <summary>
+        /// Регистрация окончена. 
+        /// </summary>
+        /// <value></value>
+        public bool IsSubscribe
+        {
+            get
+            {
+                return _state == StateType.END_SUBSCRIBE;
+            }
+        }
 
         private SubscribePollTicket[] _subscribeTickets = new SubscribePollTicket[0];
 
         /// <summary>
         /// Сдесь хранятся индексы пуллов в которых работают наши Action.
         /// </summary>
-        private ulong[] _pointerToThePollID;
+        private ulong[] _pointerToThePollID = new ulong[0];
         /// <summary>
         /// Указан индекс в массиве в менеджере пуллов где хранится наш обрабатываемый Action.
         /// </summary>
-        private int[] _pointerIndexInArrayToThePoll;
+        private int[] _pointerIndexInArrayToThePoll = new int[0];
 
         /// <summary>
         /// Количесво подписаных билетов. Это значение нужно для того что бы при уничтожении
@@ -32,10 +56,16 @@ namespace Butterfly.system.objects.main.controller
 
         private readonly object _locker = new object();
 
+        /// <summary>
+        /// Имеются ли у нас регистрационые билеты. 
+        /// </summary>
+        /// <value></value>
+        public bool IsRegisterTicket { private set; get; } = false;
+
         public Poll(informing.IMain mainInforming, information.State stateInformation,
             information.Header headerInformation, information.DOM DOMInformation,
                 manager.description.ISubscribe subscribeManager)
-            : base("SubscribeManager", mainInforming)
+            : base("SubscribePollManager", mainInforming)
         {
             _stateInformation = stateInformation;
             _headerInformation = headerInformation;
@@ -59,21 +89,19 @@ namespace Butterfly.system.objects.main.controller
                 // Сообщает что мы отовсюду отписались;
                 if (informingType.HasFlag(root.poll.InformingType.EndUnsubscribe))
                 {
-                    if (State == StateType.REGISTER_UNSUBSCRIBE)
+                    if (_state == StateType.REGISTER_UNSUBSCRIBE)
                     {
                         if (_pointerToThePollID[indexSubsribePollManager] == idPoll &&
                             _pointerIndexInArrayToThePoll[indexSubsribePollManager] == indexRootPollClients)
                         {
                             if ((--_subscribeTicketCount) == 0)
                             {
-                                State = StateType.END_UNSUBSCRIBE;
+                                _state = StateType.END_UNSUBSCRIBE;
 
                                 _subscribeManager.EndUnsubscribe();
                             }
                         }
                     }
-                    else
-                        throw new Exception("111111111111111111111111111111111111111111111111111111");
                 }
                 else if (informingType.HasFlag(root.poll.InformingType.ChangeOfIndex))
                 {
@@ -82,7 +110,7 @@ namespace Butterfly.system.objects.main.controller
 
                     // В момент отписки наше место положение изменилось, повторное информирование
                     // с новым местом лежит на нас.
-                    if (State == StateType.REGISTER_UNSUBSCRIBE)
+                    if (_state == StateType.REGISTER_UNSUBSCRIBE)
                     {
                         _DOMInformation.RootManager.ActionInvoke(() =>
                         {
@@ -102,7 +130,7 @@ namespace Butterfly.system.objects.main.controller
                 }
                 else if (informingType.HasFlag(root.poll.InformingType.EndSubscribe))
                 {
-                    if (State == StateType.REGISTER_SUBSCRIBE)
+                    if (_state == StateType.REGISTER_SUBSCRIBE)
                     {
                         // Запишем куда зарегестрировался наш тикет.
                         _pointerToThePollID[indexSubsribePollManager] = idPoll;
@@ -111,13 +139,11 @@ namespace Butterfly.system.objects.main.controller
                         // Дожидаемся пока все билеты откликрутся о завершении регистрации.
                         if ((++_subscribeTicketCount) == _pointerToThePollID.Length)
                         {
-                            State = StateType.END_SUBSCRIBE;
+                            _state = StateType.END_SUBSCRIBE;
 
                             _subscribeManager.EndSubscribe();
                         }
                     }
-                    else
-                        throw new Exception("333333333333333333333333333333333333333333333");
                 }
             }
         }
@@ -129,10 +155,12 @@ namespace Butterfly.system.objects.main.controller
         /// <param name="action">Action который нам предстоит обрабатывать.</param>
         public void Add(string name, Action action, string type)
         {
-            //lock (_locker)
+            lock (_locker)
             {
                 if (_headerInformation.IsNodeObject())
                 {
+                    IsRegisterTicket = true;
+
                     SubscribePollTicket ticket = new SubscribePollTicket()
                     {
                         Name = name,
@@ -151,11 +179,11 @@ namespace Butterfly.system.objects.main.controller
 
         public void Subscribe()
         {
-            //lock (_locker)
+            lock (_locker)
             {
-                if (State == StateType.CREATING_TICKET)
+                if (_state == StateType.CREATING_TICKET)
                 {
-                    State = StateType.REGISTER_SUBSCRIBE;
+                    _state = StateType.REGISTER_SUBSCRIBE;
 
                     // Сюда запишутся данные о том в каком пуле зарегестрирован наш билет.
                     // Если в последсвии билет будет передан в другой пулл, то
@@ -163,47 +191,52 @@ namespace Butterfly.system.objects.main.controller
                     _pointerToThePollID = new ulong[_subscribeTickets.Length];
 
                     _pointerIndexInArrayToThePoll = new int[_subscribeTickets.Length];
-                    // Поставим в очередь на регистрацию.
 
-                    _DOMInformation.RootManager.ActionInvoke(() =>
-                    {
-                        _DOMInformation.RootManager.AddSubscribeTickets(_subscribeTickets);
-                    });
+                    // Поставим в очередь на регистрацию.
+                    _DOMInformation.RootManager.ActionInvoke(()
+                        => _DOMInformation.RootManager.AddSubscribeTickets(_subscribeTickets));
                 }
+                else
+                    throw new Exception();
             }
         }
+
+        private int i = 0;
 
         /// <summary>
         /// Регистрируемся на отписку из пуллов.
         /// </summary>
         public void Unsubscribe()
         {
-            //lock (_locker)
+            lock (_locker)
             {
-                if (_subscribeTicketCount > 0)
+                if (_state == StateType.END_SUBSCRIBE)
                 {
-                    State = StateType.REGISTER_UNSUBSCRIBE;
-
-                    UnsubscribePollTicket[] unsubscribePollTicket =
-                        new UnsubscribePollTicket[_subscribeTickets.Length];
-
-                    for (int i = 0; i < _subscribeTickets.Length; i++)
+                    if (IsRegisterTicket)
                     {
-                        unsubscribePollTicket[i] = new UnsubscribePollTicket()
+                        _state = StateType.REGISTER_UNSUBSCRIBE;
+
+                        UnsubscribePollTicket[] unsubscribePollTicket =
+                            new UnsubscribePollTicket[_subscribeTickets.Length];
+
+                        for (int i = 0; i < _subscribeTickets.Length; i++)
                         {
-                            Name = _subscribeTickets[i].Name,
-                            PollID = _pointerToThePollID[i],
-                            IDObject = _DOMInformation.ID,
-                            IndexInRootPoll = _pointerIndexInArrayToThePoll[i],
-                            IndexInSubscribePollManager = i
-                        };
-                    }
+                            unsubscribePollTicket[i] = new UnsubscribePollTicket()
+                            {
+                                Name = _subscribeTickets[i].Name,
+                                PollID = _pointerToThePollID[i],
+                                IDObject = _DOMInformation.ID,
+                                IndexInRootPoll = _pointerIndexInArrayToThePoll[i],
+                                IndexInSubscribePollManager = i
+                            };
+                        }
 
-                    _DOMInformation.RootManager.ActionInvoke(() =>
-                    {
-                        _DOMInformation.RootManager.AddUnsubscribeTickets(unsubscribePollTicket);
-                    });
+                        _DOMInformation.RootManager.ActionInvoke(() 
+                            => _DOMInformation.RootManager.AddUnsubscribeTickets(unsubscribePollTicket));
+                    }
                 }
+                else
+                    throw new Exception();
             }
         }
     }

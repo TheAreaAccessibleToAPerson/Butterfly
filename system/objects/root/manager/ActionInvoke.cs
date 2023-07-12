@@ -2,35 +2,54 @@ namespace Butterfly.system.objects.root.manager
 {
     public sealed class ActionInvoke : Controller.LocalField<uint>
     {
-        private readonly collection.Value<Action> _values
-            = new collection.Value<Action>();
+        public const string TEG = "ActionInvokeTeg";
 
-        public void Add(Action value)
-            => _values.Add(value);
+        private collection.Value<System.Action> _values
+            = new collection.Value<System.Action>();
+
+        private readonly object _locker = new object();
+
+        public bool IsDestroy = false;
+
+        public void Add(System.Action value)
+        {
+            if (StateInformation.IsStart && IsDestroy == false)
+            {
+                _values.Add(value);
+            }
+            else if (IsDestroy == false)
+            {
+                value.Invoke();
+            }
+            else
+            {
+                Process();
+
+                Task.Run(value.Invoke);
+            }
+        }
 
         void Construction()
         {
-            start_timer();
+            add_teg(TEG);
 
-            Task.Run(() =>
-            {
-                while (true)
-                {
-                    if (step_timer() > Field) return;
+            add_event("SYSTEM", Process);
+        }
 
-                    Process();
-
-                    sleep(10);
-                }
-            });
-
-            add_event("", Process);
+        void Start()
+        {
+            //add_thread("", Process, 2, Thread.Priority.Highest);
         }
 
         void Process()
         {
-            if (_values.TryExtractAll(out Action[] actions))
-                foreach(Action action in actions) action.Invoke();
+            if (_values.TryExtractAll(out System.Action[] actions))
+            {
+                foreach (System.Action action in actions)
+                {
+                    action.Invoke();
+                }
+            }
         }
     }
 }

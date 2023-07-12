@@ -11,6 +11,12 @@ namespace Butterfly.system.objects.main.information
             public void Set(string state);
 
             /// <summary>
+            /// Указывает этап на котором обьект прекратил свою сборку. 
+            /// </summary>
+            /// <param name="state"></param>
+            public void Set(int state);
+
+            /// <summary>
             /// Получить текущее состояние обьекта. 
             /// </summary>
             /// <returns></returns>
@@ -44,7 +50,22 @@ namespace Butterfly.system.objects.main.information
 
             public const string STOPPING = "Stopping";
             public const string STOP = "Stop";
+
+            public const int INTERRUPTED_CONSTRUCTION = 0;
+            public const int CALL_DESTROY_IN_CONTRUCTION = 1;
+            public const int CALL_DESTROY_IN_BRANCH_OBJECTS_CONTRUCTION = 2;
+
+            public const int INTERRUPTED_CONFIGURATE = 3;
+            public const int CALL_DESTROY_IN_CONFIGURATE = 4;
+            public const int CALL_DESTROY_IN_BRANCH_OBJECTS_CONFIGURATE= 5;
+
+            public const int INTERRUPTED_STARTING = 6;
+            public const int INTERRUPTED_CALL_DESTROY_IN_START = 7;
+            public const int INTERRUPTED_CALL_DESTROY_IN_BRANCH_OBJECTS_STARTING = 8;
         }
+
+        public int Interrupted {private set; get;} = -1;
+        public bool IsInterrupted {get { return Interrupted > -1; } }
 
         public string CurrentState { private set; get;} = Data.OCCUPERENCE;
 
@@ -60,7 +81,7 @@ namespace Butterfly.system.objects.main.information
         /// </summary>
         public bool IsDestroying
         { 
-            get { lock(Locker) { return _isDestroying;} }
+            get { /*lock(Locker)*/ { return _isDestroying;} }
         }
 
         /// <summary>
@@ -74,7 +95,7 @@ namespace Butterfly.system.objects.main.information
         /// </summary>
         public bool IsDeferredDestroying 
         {
-            get { lock(Locker) { return _isDeferredDestroying; } }
+            get { /*lock(Locker)*/ { return _isDeferredDestroying; } }
         }
 
         /// <summary>
@@ -133,14 +154,13 @@ namespace Butterfly.system.objects.main.information
         }
 
         void state.IManager.Set(string state) 
-        {
-            CurrentState = state;
-        }
+            => CurrentState = state;
+
+        void state.IManager.Set(int state) 
+            => Interrupted = state;
 
         string state.IManager.Get()
-        {
-            return CurrentState;
-        }
+            => CurrentState;
 
         void state.IManager.Destroy()
         {
@@ -197,6 +217,13 @@ namespace Butterfly.system.objects.main.information
             }
 
             public void Set(string state) 
+            {
+                //SystemInformation($"State replace:{_stateManager.Get()}->{state}.");
+
+                _stateManager.Set(state);
+            }
+
+            public void Set(int state) 
             {
                 //SystemInformation($"State replace:{_stateManager.Get()}->{state}.");
 

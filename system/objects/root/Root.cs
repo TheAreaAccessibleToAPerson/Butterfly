@@ -30,9 +30,19 @@ namespace Butterfly.system.objects.root
                 ("ActionInvoke", StartingTime);
         }
 
-        void Start() => obj<ObjectType>(Name);
+        void Start()  
+        {
+            obj<ObjectType>(Name);
+        }
 
-        void IManager.ActionInvoke(Action action) 
+        public override void destroy()
+        {
+            ActionInvokeManager.IsDestroy = true;
+
+            base.destroy();
+        }
+
+        void IManager.ActionInvoke(System.Action action) 
             => ActionInvokeManager.Add(action);
 
         void IManager.AddSubscribeTickets(main.SubscribePollTicket[] tickets)
@@ -41,7 +51,7 @@ namespace Butterfly.system.objects.root
         void IManager.AddUnsubscribeTickets(main.UnsubscribePollTicket[] tickets)
             => PollThreads.Add(tickets);
 
-        void description.ILife.Run(Gudron.Settings s)
+        void description.ILife.Run(Butterfly.Settings s)
         {
             Name = s.Name;
             StartingTime = s.StartingTime;
@@ -54,13 +64,15 @@ namespace Butterfly.system.objects.root
 
             ((main.description.IDOM)this).CreatingNode();
 
-            global::System.Threading.Thread.CurrentThread.Priority = global::System.Threading.ThreadPriority.Lowest;
+            global::System.Threading.Thread.CurrentThread.Priority 
+                = global::System.Threading.ThreadPriority.Lowest;
 
             while (true)
             {
-                global::System.GC.Collect();
+                GC.Collect();
 
-                if (StateInformation.IsStop) return;
+                if (StateInformation.IsStop) 
+                    return;
 
                 sleep (2000);
             }

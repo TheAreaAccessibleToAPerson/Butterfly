@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices.ComTypes;
 namespace Butterfly.system.objects.main.manager
 {
     public class LifeCyrcle : Informing, dispatcher.ILifeCyrcle
@@ -13,12 +14,14 @@ namespace Butterfly.system.objects.main.manager
             /// <summary>
             /// Приступаем к запуску обьектов.
             /// </summary>
+            public const string BEGIN_CONFIGURATE = "ConfigurateObject";
+
             public const string BEGIN_STARTING = "StartingObject";
 
             /// <summary>
             /// Продолжаем запуск обьекта. 
             /// </summary>
-            public const string CONTINUE_STARTING = "ContinueStartingObject";
+            public const string BEGIN_START = "BeginStart";
 
             /// <summary>
             /// Приступает к остановки обьектов. 
@@ -30,6 +33,7 @@ namespace Butterfly.system.objects.main.manager
         private readonly information.State _stateInformation;
         private readonly information.Header _headerInformation;
         private readonly information.DOM _DOMInformation;
+        private readonly information.Tegs _tegsInformation;
 
         private readonly manager.BranchObjects _branchObjectsManager;
         private readonly manager.NodeObjects _nodeObjectsManager;
@@ -38,13 +42,15 @@ namespace Butterfly.system.objects.main.manager
 
         public LifeCyrcle(informing.IMain mainInforming, information.Header headerInformation,
             information.State stateInformation, information.State.Manager stateInformationManager,
-                information.DOM DOMInformation, manager.BranchObjects branchObjectsManager,
-                    manager.NodeObjects nodeObjectsManager, IDispatcher dispatcher)
+                information.DOM DOMInformation, information.Tegs tegsInformation,
+                    manager.BranchObjects branchObjectsManager, manager.NodeObjects nodeObjectsManager,
+                        IDispatcher dispatcher)
             : base("LifeCyrcleManager", mainInforming)
         {
             _stateInformationManager = stateInformationManager;
-            _stateInformation = stateInformation;
             _headerInformation = headerInformation;
+            _stateInformation = stateInformation;
+            _tegsInformation = tegsInformation;
             _DOMInformation = DOMInformation;
 
             _branchObjectsManager = branchObjectsManager;
@@ -53,125 +59,181 @@ namespace Butterfly.system.objects.main.manager
             _dispatcher = dispatcher;
         }
 
-        /// <summary>
-        /// В данном методе реализуется переход от жизненого состояния OCCUPERENCE в CONSTRUCTION.
-        /// После смены состояния вызовется системный метод void Contruction(), в данном методе обьект
-        /// узнает о своих Branch обьектах, установим связь с глобальными обьектами определеными в 
-        /// родительских обьектах и укажим на какие события нужно подписаться. Так как Branch 
-        /// обьекты являются статическими для своего родителя, и их сущесвование намертво будет связано 
-        /// с родителем, то перед тем как текущий обьект продолжит свою сборку, ему необходимо вызвать 
-        /// текущий метод в своих Branch обьектах, а те в свою очередь вызовут в своих и тд...
-        /// Предпологается что данный метод должен 100% вызватся во всех обьектах.
-        /// Подписка/отписка на события в Branch обьектах будет осущесвлятся через его Node обьект.
-        /// </summary>
         void dispatcher.ILifeCyrcle.Contruction()
         {
             lock (_stateInformation.Locker)
-                if (_stateInformationManager.Replace
-                    (information.State.Data.CONSTRUCTION, information.State.Data.OCCUPERENCE) == false)
-                    throw new Exception();
+            {
+                lock (_DOMInformation.NearBoardNodeObject.StateInformation.Locker)
+                {
+                    if (_stateInformation.IsDestroying == false &&
+                        _DOMInformation.NearBoardNodeObject.StateInformation.IsDestroying == false)
+                    {
+                        if (_stateInformationManager.Replace(information.State.Data.CONSTRUCTION, information.State.Data.OCCUPERENCE))
+                        {
+                            if (Hellper.GetSystemMethod("Construction", _DOMInformation.CurrentObject.GetType(),
+                            out System.Reflection.MethodInfo oSystemMethodConstruction))
+                                oSystemMethodConstruction.Invoke(_DOMInformation.CurrentObject, null);
 
-            if (Hellper.GetSystemMethod("Construction", _DOMInformation.CurrentObject.GetType(),
-                out System.Reflection.MethodInfo oSystemMethodConstruction))
-                oSystemMethodConstruction.Invoke(_DOMInformation.CurrentObject, null);
+                            if (_stateInformation.IsDestroying == false &&
+                                _DOMInformation.NearBoardNodeObject.StateInformation.IsDestroying == false)
+                            {
+                                _branchObjectsManager.LifeCyrcle(Data.BEGIN_BRANCH_OBJECT_CONTRUCTION);
 
-            _branchObjectsManager.LifeCyrcle(Data.BEGIN_BRANCH_OBJECT_CONTRUCTION);
+                                if (_stateInformation.IsDestroying == false &&
+                                    _DOMInformation.NearBoardNodeObject.StateInformation.IsDestroying == false)
+                                {
+                                    if (_headerInformation.IsNodeObject())
+                                        _dispatcher.Process(manager.Dispatcher.Command.CONFIGURATE_OBJECT);
 
-            _stateInformationManager.Set(information.State.Data.SUBSCRIBE);
+                                    return;
+                                }
+                                else _stateInformationManager.Set(information.State.Data.CALL_DESTROY_IN_BRANCH_OBJECTS_CONTRUCTION);
+                            }
+                            else _stateInformationManager.Set(information.State.Data.CALL_DESTROY_IN_CONTRUCTION);
+                        }
+                        else throw new Exception();
+                    }
+                    else _stateInformationManager.Set(information.State.Data.INTERRUPTED_CONSTRUCTION);
 
-            _dispatcher.Process(manager.Dispatcher.Command.START_SUBSCRIBE);
+                    if (_headerInformation.IsNodeObject())
+                        ((manager.INodeObjects)_DOMInformation.ParentObject).InformingCollected();
+                }
+            }
         }
 
-        /// <summary>
-        /// После того как Node обьект подписался на все события вызовется данный метод.
-        /// Сменим жизненый цикл с CONSTRUCTION на STARTING. Проверим не был ли выставлен
-        /// ближайший Board обьект на уничтожение. После чего вызовем системный метод 
-        /// void Configurate(). После чего проверим не был ли ближайший Board обьект выставлен
-        /// на уничтожение, если все нормально то вызовем данный метод во всех Branch обьектах.
-        /// После чего запустится системный метод Start().
-        /// </summary>
-        void dispatcher.ILifeCyrcle.Starting()
+        void dispatcher.ILifeCyrcle.Configurate()
         {
             lock (_stateInformation.Locker)
             {
-                if (_stateInformationManager.Replace(information.State.Data.CONFIGURATE, information.State.Data.SUBSCRIBE))
+                if (_stateInformation.IsDestroying == false &&
+                    _DOMInformation.NearBoardNodeObject.StateInformation.IsDestroying == false)
                 {
-                    if (_DOMInformation.NearBoardNodeObject.StateInformation.IsDestroying == false)
+                    if (_stateInformationManager.Replace(information.State.Data.CONFIGURATE, information.State.Data.CONSTRUCTION))
                     {
                         if (Hellper.GetSystemMethod("Configurate", _DOMInformation.CurrentObject.GetType(),
-                            out System.Reflection.MethodInfo oSystemMethodConfigurate))
+                        out System.Reflection.MethodInfo oSystemMethodConfigurate))
                             oSystemMethodConfigurate.Invoke(_DOMInformation.CurrentObject, null);
 
-                        if (_DOMInformation.NearBoardNodeObject.StateInformation.IsDestroying == false)
+                        if (_stateInformation.IsDestroying == false &&
+                            _DOMInformation.NearBoardNodeObject.StateInformation.IsDestroying == false)
                         {
-                            if (_stateInformationManager.Replace(information.State.Data.STARTING, information.State.Data.CONFIGURATE))
+                            _branchObjectsManager.LifeCyrcle(Data.BEGIN_CONFIGURATE);
+
+                            if (_stateInformation.IsDestroying == false &&
+                                _DOMInformation.NearBoardNodeObject.StateInformation.IsDestroying == false)
                             {
-                                _branchObjectsManager.LifeCyrcle(Data.BEGIN_STARTING);
+                                if (_headerInformation.IsNodeObject())
+                                    _dispatcher.Process(manager.Dispatcher.Command.STARTING_OBJECT);
 
-                                if (_DOMInformation.NearBoardNodeObject.StateInformation.IsDestroying == false)
-                                {
-                                    if (Hellper.GetSystemMethod("Start", _DOMInformation.CurrentObject.GetType(),
-                                        out System.Reflection.MethodInfo oSystemMethodStart))
-                                        oSystemMethodStart.Invoke(_DOMInformation.CurrentObject, null);
-
-                                    if (_headerInformation.IsNodeObject() &&
-                                        _DOMInformation.NearBoardNodeObject.StateInformation.IsDestroying == false)
-                                    {
-                                        _dispatcher.Process(manager.Dispatcher.Command.CONTINUE_STARTING_OBJECT);
-
-                                        return;
-                                    }
-                                }
+                                return;
                             }
+                            else _stateInformationManager.Set(information.State.Data.CALL_DESTROY_IN_BRANCH_OBJECTS_CONFIGURATE);
                         }
+                        else _stateInformationManager.Set(information.State.Data.CALL_DESTROY_IN_CONFIGURATE);
                     }
+                    else throw new Exception();
                 }
+                else _stateInformationManager.Set(information.State.Data.INTERRUPTED_CONFIGURATE);
 
                 if (_headerInformation.IsNodeObject())
                     ((manager.INodeObjects)_DOMInformation.ParentObject).InformingCollected();
             }
         }
 
-        void dispatcher.ILifeCyrcle.ContinueStarting()
+        void dispatcher.ILifeCyrcle.Starting()
         {
             lock (_stateInformation.Locker)
             {
-                if (_DOMInformation.NearBoardNodeObject.StateInformation.IsDestroying == false)
+                if (_stateInformation.IsDestroying == false &&
+                    _DOMInformation.NearBoardNodeObject.StateInformation.IsDestroying == false)
                 {
-                    _branchObjectsManager.LifeCyrcle(Data.CONTINUE_STARTING);
+                    if (_stateInformationManager.Replace(information.State.Data.STARTING, information.State.Data.CONFIGURATE))
+                    {
+                        _branchObjectsManager.LifeCyrcle(Data.BEGIN_STARTING);
 
-                    _dispatcher.Process(manager.Dispatcher.Command.STARTING_THREAD + __.AND +
-                        manager.Dispatcher.Command.CREATING_DEFERRED_NODE_OBJECT);
+                        if (_stateInformation.IsDestroying == false ||
+                            _DOMInformation.NearBoardNodeObject.StateInformation.IsDestroying == false)
+                        {
+                            if (Hellper.GetSystemMethod("Start", _DOMInformation.CurrentObject.GetType(),
+                            out System.Reflection.MethodInfo oSystemMethodConfigurate))
+                                oSystemMethodConfigurate.Invoke(_DOMInformation.CurrentObject, null);
 
-                    _stateInformationManager.Replace
-                        (information.State.Data.START, information.State.Data.STARTING);
+                            if (_stateInformation.IsDestroying == false ||
+                                _DOMInformation.NearBoardNodeObject.StateInformation.IsDestroying == false)
+                            {
+                                if (_stateInformationManager.Replace(information.State.Data.SUBSCRIBE, information.State.Data.STARTING))
+                                {
+                                    _dispatcher.Process(manager.Dispatcher.Command.START_SUBSCRIBE);
+
+                                    return;
+                                }
+                                else throw new Exception();
+                            }
+                            else _stateInformationManager.Set(information.State.Data.INTERRUPTED_CALL_DESTROY_IN_START);
+                        }
+                        else _stateInformationManager.Set(information.State.Data.INTERRUPTED_CALL_DESTROY_IN_BRANCH_OBJECTS_STARTING);
+                    }
+                    else throw new Exception();
                 }
+                else _stateInformationManager.Set(information.State.Data.INTERRUPTED_STARTING);
+
+                if (_headerInformation.IsNodeObject())
+                    ((manager.INodeObjects)_DOMInformation.ParentObject).InformingCollected();
+            }
+        }
+
+        void dispatcher.ILifeCyrcle.Start()
+        {
+            lock (_stateInformation.Locker)
+            {
+                if (_stateInformation.IsDestroying == false ||
+                    _DOMInformation.NearBoardNodeObject.StateInformation.IsDestroying == false)
+                {
+                    if (_stateInformationManager.Replace(information.State.Data.START, information.State.Data.SUBSCRIBE))
+                    {
+                        _branchObjectsManager.LifeCyrcle(Data.BEGIN_START);
+
+                        _dispatcher.Process(manager.Dispatcher.Command.STARTING_THREAD);
+                    }
+                    else throw new Exception();
+                }
+                else
+                    _stateInformationManager.Set("***");
 
                 if (_headerInformation.IsNodeObject())
                     ((manager.INodeObjects)_DOMInformation.ParentObject).InformingCollected();
 
                 if (_stateInformation.IsDeferredDestroying)
                 {
-                    _DOMInformation.CurrentObject.destroy();
+                    ((manager.ILifeCyrcle)_DOMInformation.CurrentObject).ContinueDestroy();
                 }
             }
+
         }
 
         void dispatcher.ILifeCyrcle.Stopping()
         {
+            if (_stateInformation.IsDestroying == false) throw new Exception();
+
             lock (_stateInformation.Locker)
             {
-                if (_stateInformation.IsStart || _stateInformation.IsStarting || _stateInformation.IsConfigurate)
-                {
-                    if (Hellper.GetSystemMethod("Stop", _DOMInformation.CurrentObject.GetType(),
-                        out System.Reflection.MethodInfo oSystemMethodStart))
-                        oSystemMethodStart.Invoke(_DOMInformation.CurrentObject, null);
-                }
+                if (_stateInformation.IsStopping) throw new Exception();
 
                 _stateInformationManager.Set(information.State.Data.STOPPING);
 
+                if (_stateInformation.IsInterrupted)
+                {
+                    if (_stateInformation.Interrupted > 3)
+                    {
+                        if (Hellper.GetSystemMethod("Stop", _DOMInformation.CurrentObject.GetType(),
+                            out System.Reflection.MethodInfo oSystemMethodStart))
+                            oSystemMethodStart.Invoke(_DOMInformation.CurrentObject, null);
+                    }
+                }
+
                 if (_headerInformation.IsNodeObject())
                 {
+                    // Вызывается синхронно.
                     _dispatcher.Process(manager.Dispatcher.Command.START_UNSUBSCRIBE);
                 }
                 else
@@ -181,10 +243,15 @@ namespace Butterfly.system.objects.main.manager
             }
         }
 
+        // Поуберить или
+
         void dispatcher.ILifeCyrcle.ContinueStopping()
         {
             lock (_stateInformation.Locker)
             {
+                if (_stateInformation.IsDestroying == false) throw new Exception();
+                if (_stateInformation.IsStop) throw new Exception();
+
                 if (_nodeObjectsManager.Count == 0 && _branchObjectsManager.Count == 0)
                 {
                     _dispatcher.Process(manager.Dispatcher.Command.REMOVE_GLOBAL_OBJECTS);
@@ -206,7 +273,15 @@ namespace Butterfly.system.objects.main.manager
                     }
                     else
                     {
-                        _nodeObjectsManager.StoppingAllObject();
+                        if (_tegsInformation.Contains(root.manager.PollThreads.TEG))
+                        {
+                            _nodeObjectsManager.StoppingAllObject();
+                        }
+                        else
+                        {
+                            _DOMInformation.RootManager.ActionInvoke
+                                (_nodeObjectsManager.StoppingAllObject);
+                        }
                     }
                 }
             }
@@ -214,41 +289,76 @@ namespace Butterfly.system.objects.main.manager
 
         public void Destroy()
         {
-            /// Если обьект уже останавливается. 
-            if (_stateInformation.IsStopping) return;
+            if (_stateInformation.IsStop)
+                SystemInformation($"Вы вызвали метод destroy() у обьекта {_headerInformation.Explorer}" +
+                    "который уже был удален из системы.");
 
-            /// Обьект уже выставлен на уничтожение.
-            if (_stateInformation.IsDestroying) return;
+            //************************Грязная проверка**********************
 
-            // Обьект уже выставлен на отложеное уничтжение.
-            if (_stateInformation.IsDeferredDestroying &&
-                (_stateInformation.IsOccuperence || _stateInformation.IsContruction || _stateInformation.IsSubscribe))
+            // Данный обьект может быть выставлен на отложеное уничтожение если 
+            // в данный момент он находится в состоянии Subscribe.
+            // После того как подписка будет окончена обьект начнет уничтожатся.
+            if (_stateInformation.IsDeferredDestroying == false)
             {
-                return;
+                //...
             }
+            // 1) Обьект уже начал свое уничтожние.
+            // 2) Обьект уже начал процесс остановки.
+            // 3) Обьект уже значет что после создания ему нужно начать свое уничтожение.
+            else if (_stateInformation.IsDestroying || _stateInformation.IsStopping ||
+                _stateInformation.IsDeferredDestroying)
+                return;
+
+            //**************************************************************
 
             lock (_stateInformation.Locker)
             {
-                // Пока обьект собирается мы не можем его уничтожить.
-                if (_stateInformation.IsDeferredDestroying == false &&
-                    (_stateInformation.IsOccuperence || _stateInformation.IsContruction || _stateInformation.IsSubscribe))
+
+                // Обьект находится в состоянии подписки и мы в первый раз сообщаем
+                // ему о том что после ее окончания нужно преступить к уничтожению.
+                if (_stateInformation.IsSubscribe &&
+                    _stateInformation.IsDeferredDestroying == false)
                 {
                     _stateInformationManager.DeferredDestroy();
-                }
-                else if (_stateInformation.IsOccuperence || _stateInformation.IsContruction || _stateInformation.IsSubscribe)
-                {
+
                     return;
                 }
-                else if (_stateInformation.IsDestroying == false)
+
+                //if (_stateInformation.IsSubscribe) return;
+
+                //************************Чистая проверка****************************
+                if (_stateInformation.IsDeferredDestroying == false)
+                {
+                    //...
+                }
+                else if (_stateInformation.IsDestroying || _stateInformation.IsStopping ||
+                    _stateInformation.IsDeferredDestroying)
+                    return;
+                //********************************************************************
+
+                // Обьект начинаем процедуру уничтожения.
+                if (_stateInformation.IsDestroying == false)
                 {
                     _stateInformationManager.Destroy();
 
-                    if (_headerInformation.IsBoard())
-                        _DOMInformation.RootManager.ActionInvoke(()
-                            => _dispatcher.Process(manager.Dispatcher.Command.STOPPING_OBJECT));
-                    else
-                        _DOMInformation.RootManager.ActionInvoke
-                            (_DOMInformation.NearBoardNodeObject.destroy);
+                    _DOMInformation.RootManager.ActionInvoke(() =>
+                    {
+                        if (_headerInformation.IsBoard())
+                        {
+                            ((manager.IDispatcher)_DOMInformation.CurrentObject).
+                                Process(manager.Dispatcher.Command.STOPPING_OBJECT);
+                        }
+                        else if (_DOMInformation.NearBoardNodeObject.StateInformation.IsDestroying == false &&
+                            _DOMInformation.NearBoardNodeObject.StateInformation.IsDeferredDestroying == false)
+                        {
+                            _DOMInformation.NearBoardNodeObject.destroy();
+                        }
+                        else if (_DOMInformation.NodeObject.StateInformation.IsDestroying == false &&
+                            _DOMInformation.NodeObject.StateInformation.IsDeferredDestroying == false)
+                        {
+                            _DOMInformation.NodeObject.destroy();
+                        }
+                    });
                 }
             }
         }
@@ -257,16 +367,27 @@ namespace Butterfly.system.objects.main.manager
         {
             lock (_stateInformation.Locker)
             {
-                if (_stateInformation.IsDestroying == false &&
-                _DOMInformation.NearBoardNodeObject.StateInformation.IsDestroying)
-                {
-                    _stateInformationManager.Destroy();
+                _stateInformationManager.Destroy();
 
-                    _dispatcher.Process(manager.Dispatcher.Command.STOPPING_OBJECT);
-                }
-                if (_stateInformation.IsDestroying && _stateInformation.IsStopping)
+                if (_headerInformation.IsBoard())
                 {
-                    _dispatcher.Process(manager.Dispatcher.Command.CONTINUE_STOPPING);
+                    ((manager.IDispatcher)_DOMInformation.CurrentObject).
+                        Process(manager.Dispatcher.Command.STOPPING_OBJECT);
+                }
+                else if (_DOMInformation.NearBoardNodeObject.StateInformation.IsDestroying == false &&
+                    _DOMInformation.NearBoardNodeObject.StateInformation.IsDeferredDestroying == false)
+                {
+                    _DOMInformation.NearBoardNodeObject.destroy();
+                }
+                else if (_DOMInformation.NodeObject.StateInformation.IsDestroying == false &&
+                    _DOMInformation.NodeObject.StateInformation.IsDeferredDestroying == false)
+                {
+                    _DOMInformation.NodeObject.destroy();
+                }
+                else
+                {
+                    ((manager.IDispatcher)_DOMInformation.CurrentObject).
+                        Process(manager.Dispatcher.Command.STOPPING_OBJECT);
                 }
             }
         }

@@ -8,6 +8,6 @@ namespace Butterfly.system.objects.root.description
         /// <summary>
         /// Запускает систему. 
         /// </summary>
-        public void Run(Gudron.Settings settings);
+        public void Run(Butterfly.Settings settings);
     }
 }

@@ -69,6 +69,16 @@ namespace Butterfly.system.objects.root
                 lock (_subsribeAndUnsubscribeLocker) Add(ticket);
         }
 
+        void Construction()
+        {
+            add_teg(root.manager.ActionInvoke.TEG);
+        }
+
+        void Stop()
+        {
+            Console("STOP");
+        }
+
         void Start()
             => add_thread(Field.Name, () =>
             {

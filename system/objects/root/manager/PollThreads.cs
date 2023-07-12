@@ -1,46 +1,19 @@
-using System.Threading;
-namespace Butterfly
-{
-    public class Events
-    {
-        public class PollInformation
-        {
-            public string Name { get; init; }
-            public uint TimeDelay { get; init; }
-            public Thread.Priority ThreadPriority { get; init; }
-            public bool IsDestroy { get; init; } = true;
-            public uint Size { get; init; }
-        }
-
-        private static Dictionary<string, PollInformation> _values = new Dictionary<string, PollInformation>();
-
-        public static void AddSetting(string name, uint timeDelay, uint Size,
-            bool isDestroy, Thread.Priority threadPriority)
-            => _values.Add
-                (name, new PollInformation()
-                {
-                    Name = name,
-                    TimeDelay = timeDelay,
-                    Size = Size,
-                    IsDestroy = isDestroy,
-                    ThreadPriority = threadPriority
-                });
-
-        public static bool GetSetting(string name, out PollInformation information)
-            => _values.TryGetValue(name, out information);
-    }
-}
-
 namespace Butterfly.system.objects.root.manager
 {
     public sealed class PollThreads : Controller.LocalField<EventSetting[]>
     {
+        public const string TEG = "PollThreadsTeg";
+
         private readonly Dictionary<string, Poll> _values
             = new Dictionary<string, Poll>();
         private readonly object _locker = new object();
 
         private readonly Dictionary<string, EventSetting> _eventSettings
             = new Dictionary<string, EventSetting>();
+
+        void Stop()
+        {
+        }
 
         void Construction()
         {

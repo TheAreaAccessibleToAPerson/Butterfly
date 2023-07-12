@@ -1,22 +1,25 @@
-﻿namespace Butterfly
+﻿using System.ComponentModel;
+namespace Butterfly
 {
     public class Program
     {
         static void Main(string[] args)
-            => Gudron.run<Header2>(new Gudron.Settings()
+        {
+            Butterfly.fly<Header2>(new Butterfly.Settings()
             {
                 Name = "",
                 StartingTime = 1000,
-                SystemEvent = new EventSetting("", 10, 256000),
+                SystemEvent = new EventSetting("SYSTEM", 10, 256000),
 
                 Events = new EventSetting[]
-                {
-                    new EventSetting("1", 5, 256000),
-                    new EventSetting("2", 5, 1256000),
-                    new EventSetting("3", 50, 1256000),
-                    new EventSetting("4", 50, 1256000)
-                }
+               {
+                    new EventSetting("1", 5, 356000),
+                    new EventSetting("2", 5, 3256000),
+                    new EventSetting("3", 50, 3256000),
+                    new EventSetting("4", 50, 3256000)
+               }
             });
+        }
     }
 
     public sealed class Header : Controller
@@ -33,57 +36,66 @@
         void Construction()
         {
             listen_echo<string>("echotest")
-                .output_to((message, response) => 
+                .output_to((message, response) =>
                 {
                     Console(message);
 
                     response.To("ответ");
                 });
-            
+
             listen_message<string>("messagetest")
-                .output_to((message) => 
+                .output_to((message) =>
                 {
                     Console(message);
                 });
 
-            int i = 0;
-            add_event("1", () => 
+            add_event("1", () =>
             {
-                if (i > 1000) return;
-
-                obj<Test2>("Test2" + i++);
-                obj<Test2>("Test2" + i++);
+                if (i < 10)
+                {
+                    obj<Test2>(i++.ToString());
+                }
             });
+
+
+            //add_event("1", Update);
+            //obj<Test2>("TEST" + 88);
+        }
+
+        int i = 0;
+        void Update()
+        {
         }
 
         void Start()
         {
-            Console("START");
         }
 
         void Configurate()
         {
         }
+
         void Stop()
         {
+            Console("STOP!!");
         }
     }
 
-    public sealed class Test2 : Controller.Board
+    public sealed class Test2 : Controller
     {
         IInput<string> send_echo, send_message;
 
         void Construction()
         {
             send_echo<string>(ref send_echo, "echotest")
-                .output_to((message) => 
+                .output_to((message) =>
                 {
-                    Console($"Ответ:" + message);
-                });    
+                });
 
             send_message<string>(ref send_message, "messagetest");
 
-            obj<Test3>("TEST3");
+            //obj<Test3>("TEST3");
+            /*
             obj<Test3>("TEST31");
             obj<Test3>("TEST32");
             obj<Test3>("TEST33");
@@ -91,17 +103,31 @@
             obj<Test3>("TEST35");
             obj<Test3>("TEST36");
             obj<Test3>("TEST37");
+            obj<Test3>("TEST37");
+            */
 
-            add_event("4", Update);
+            add_event("1", Update);
         }
 
+        int i = 0;
         void Update()
         {
+            if (i < 100)
+            {
+                obj<Test3>(i++.ToString());
+
+                if (i == 88)
+                    destroy();
+
+                //obj<Test4>(i++.ToString());
+                //obj<Test5>(i++.ToString());
+            }
         }
 
         void Start()
         {
-            send_echo.To("Hello1");
+            //obj<Test3>("TEST37");
+            send_echo.To(GetKey());
             send_message.To("Hello2");
         }
 
@@ -112,42 +138,47 @@
         void Configurate()
         {
         }
-
     }
 
     public sealed class Test3 : Controller
     {
+        public static int i = 0;
         void Construction()
         {
-            obj<Test4>("TEST444");
-            obj<Test4>("TEST433");
-            obj<Test4>("TEST422");
-            obj<Test4>("TEST411");
-            obj<Test4>("TEST49");
-            obj<Test4>("TEST48");
-            obj<Test4>("TEST47");
-            obj<Test4>("TEST46");
-            obj<Test4>("TEST45");
-            obj<Test4>("TEST43");
-            obj<Test4>("TEST42");
-            obj<Test4>("TEST41");
-
-            add_event("3", Update);
+            obj<Test4>(i++.ToString());
+            obj<Test4>(i++.ToString());
+            obj<Test4>(i++.ToString());
+            obj<Test4>(i++.ToString());
+            obj<Test4>(i++.ToString());
+            obj<Test4>(i++.ToString());
+            obj<Test4>(i++.ToString());
+            obj<Test4>(i++.ToString());
+            obj<Test4>(i++.ToString());
+            obj<Test4>(i++.ToString());
+            obj<Test4>(i++.ToString());
+            obj<Test4>(i++.ToString());
+            obj<Test4>(i++.ToString());
+            obj<Test4>(i++.ToString());
+            obj<Test4>(i++.ToString());
+            obj<Test4>(i++.ToString());
+            obj<Test4>(i++.ToString());
+            obj<Test4>(i++.ToString());
         }
 
         void Update()
         {
-
         }
 
         void Start()
         {
-            //Console("START");
+            if (GetKey() == "88")
+            {
+                destroy();
+            }
         }
 
         void Configurate()
         {
-            //destroy();
         }
     }
 
@@ -157,28 +188,112 @@
         {
             //destroy();
             add_event("4", Update1);
-            add_event("1", Update1);
-            add_event("2", Update1);
             add_event("3", Update1);
+
+            obj<Test5>("AAAA");
+            obj<Test5>("21111");
+            obj<Test5>("31111");
+            obj<Test5>("41111");
+            obj<Test5>("51111");
         }
 
         void Update1()
         {
-            //destroy();
+            /*
+            if (GetKey() == "77")
+            {
+                destroy();
+            }
+            */
         }
-
-        void Update()
-        {
-        }
+        int i = 0;
 
         void Start()
         {
-            destroy();
             //Console("START");
         }
 
         void Configurate()
         {
+        }
+    }
+
+    public sealed class Test5 : Controller
+    {
+        void Construction()
+        {
+            add_event("1", Update1);
+            add_event("2", Update2);
+            add_event("3", Update3);
+            add_event("4", Update1);
+
+            /*
+                        listen_message<int>("message_test2")
+                            .output_to((message) => 
+                            {
+                                destroy();
+                            });
+                            */
+        }
+
+        static int i = 0;
+        void Update1()
+        {
+            if (i < 10)
+                obj<Test6>(i++.ToString());
+        }
+        void Update2()
+        {
+            //obj<Test6>(i++.ToString());
+        }
+        void Update3()
+        {
+            //obj<Test6>(i++.ToString());
+        }
+
+        int u = 0;
+        void Update4()
+        {
+            //obj<Test6>(i++.ToString());
+        }
+        void Start()
+        {
+            //Console("STart");
+        }
+
+        void Configurate()
+        {
+        }
+    }
+
+    public sealed class Test6 : Controller
+    {
+        IInput<int> _input;
+
+        void Construction()
+        {
+            //send_message<int>(ref _input, "message_test2");
+
+            add_event("1", Update);
+        }
+
+        void Start()
+        {
+        }
+
+        void Update()
+        {
+            /*
+            if (GetKey() == "77")
+            {
+                destroy();
+            }
+            */
+        }
+
+        void Stop()
+        {
+            // _input.To(1);
         }
     }
 }
